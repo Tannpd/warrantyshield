@@ -34,7 +34,15 @@ function getWriteClient(account) {
 }
 
 // Persistent account helper: guarantees exact same keypair and address across operations
-function getStoredAccount() {
+function getStoredAccount(customPk) {
+  if (customPk && customPk.startsWith('0x') && customPk.length === 66) {
+    const acc = createAccount(customPk);
+    try {
+      localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+    } catch (e) {}
+    return acc;
+  }
+
   try {
     const storedPk = localStorage.getItem('genlayer_warrantyshield_pk');
     if (storedPk && storedPk.startsWith('0x') && storedPk.length === 66) {
@@ -98,16 +106,29 @@ export function useWarrantyShield() {
   const [txHash, setTxHash] = useState('');
   const [txStatus, setTxStatus] = useState('');
 
-  // ONLY triggered when user explicitly clicks "Connect Wallet"
+  // Trigger MetaMask popup or connect persistent GenLayer account
   const connectWallet = useCallback(async () => {
     try {
+      let selectedAddr = '';
+      if (typeof window !== 'undefined' && window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          if (accounts && accounts.length > 0) {
+            selectedAddr = accounts[0];
+          }
+        } catch (e) {
+          console.warn('MetaMask connection skipped or rejected:', e);
+        }
+      }
+      
       const acc = getStoredAccount();
-      setAddress(acc.address);
+      const finalAddr = selectedAddr || acc.address;
+      setAddress(finalAddr);
       setGlAccount(acc);
-      return acc.address;
+      return finalAddr;
     } catch (err) {
       console.error('Wallet connect error:', err);
-      const fallbackAcc = createAccount();
+      const fallbackAcc = getStoredAccount();
       setAddress(fallbackAcc.address);
       setGlAccount(fallbackAcc);
       return fallbackAcc.address;
@@ -118,8 +139,7 @@ export function useWarrantyShield() {
   const switchAccount = (privateKeyHex) => {
     try {
       const formattedPk = privateKeyHex.trim();
-      const acc = createAccount(formattedPk);
-      localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+      const acc = getStoredAccount(formattedPk);
       setAddress(acc.address);
       setGlAccount(acc);
       return acc.address;
@@ -133,7 +153,9 @@ export function useWarrantyShield() {
   const generateNewWallet = () => {
     const acc = createAccount();
     if (acc && acc.privateKey) {
-      localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+      try {
+        localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+      } catch (e) {}
     }
     setAddress(acc.address);
     setGlAccount(acc);
