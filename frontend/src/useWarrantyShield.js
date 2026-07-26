@@ -75,6 +75,7 @@ export function useWarrantyShield() {
   const [txHash, setTxHash] = useState('');
   const [txStatus, setTxStatus] = useState('');
 
+  // ONLY triggered when user explicitly clicks "Connect Wallet"
   const connectWallet = useCallback(async () => {
     try {
       let selectedAddr = '';
@@ -298,16 +299,12 @@ export function useWarrantyShield() {
     }
   };
 
-  // Auto connect wallet on mount
+  // Fetch initial claims data on mount without triggering wallet popup
   useEffect(() => {
-    connectWallet();
-  }, [connectWallet]);
-
-  useEffect(() => {
-    if (address && CONTRACT_ADDRESS && CONTRACT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
+    if (CONTRACT_ADDRESS && CONTRACT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
       fetchClaimsState();
     }
-  }, [address, fetchClaimsState]);
+  }, [fetchClaimsState]);
 
   return {
     address,
