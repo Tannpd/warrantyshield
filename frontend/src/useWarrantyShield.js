@@ -3,9 +3,10 @@ import { createClient, createAccount } from 'genlayer-js';
 import { studionet } from 'genlayer-js/chains';
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
+// StudioNet Default Account 0: Address 0x8aB6Fd746F8928E116fd14850DE855a8A10eea13
 const STUDIONET_DEFAULT_PK = '0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba';
 
-// Custom chain that proxies RPC through Vercel same-origin to bypass browser CORS policies
+// Custom chain proxying RPC through Vercel same-origin to bypass browser CORS rules
 const getRpcEndpoint = () => {
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `${window.location.origin}/api/rpc`;
@@ -34,7 +35,9 @@ function getWriteClient(account) {
   return createClient({ chain: customStudionet, account });
 }
 
-// Persistent account helper: defaults to StudioNet Account 0 (0x8aB6...ea13)
+/**
+ * Account Manager: Ensures exact 1:1 match between UI displayed address and transaction signing account.
+ */
 function getStoredAccount(customPk) {
   if (customPk && customPk.startsWith('0x') && customPk.length === 66) {
     const acc = createAccount(customPk);
@@ -61,7 +64,7 @@ function getStoredAccount(customPk) {
   return defaultAcc;
 }
 
-// Convert Wei (u256) to human readable GEN string
+// Convert Wei (u256 BigInt) to human-readable GEN string
 export function formatGen(weiVal) {
   if (!weiVal) return '0';
   try {
@@ -79,7 +82,7 @@ export function formatGen(weiVal) {
   }
 }
 
-// Convert human readable GEN input to Wei (u256 BigInt)
+// Convert human-readable GEN input string to Wei (u256 BigInt)
 export function parseGen(genVal) {
   if (!genVal || genVal.toString().trim() === '') return 0n;
   try {
@@ -103,61 +106,55 @@ export function useWarrantyShield() {
   const [txHash, setTxHash] = useState('');
   const [txStatus, setTxStatus] = useState('');
 
-  // Connect wallet to StudioNet default account or MetaMask
+  // Unify UI address and transaction signer account 100%
+  const setAccountState = useCallback((acc) => {
+    setGlAccount(acc);
+    setAddress(acc.address);
+    return acc.address;
+  }, []);
+
+  // Connect / Activate Account
   const connectWallet = useCallback(async () => {
     try {
-      let selectedAddr = '';
       if (typeof window !== 'undefined' && window.ethereum) {
         try {
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-          if (accounts && accounts.length > 0) {
-            selectedAddr = accounts[0];
-          }
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
         } catch (e) {
-          console.warn('MetaMask connection skipped or rejected:', e);
+          console.warn('MetaMask connect prompt skipped:', e);
         }
       }
       
       const acc = getStoredAccount();
-      const finalAddr = selectedAddr || acc.address;
-      setAddress(finalAddr);
-      setGlAccount(acc);
-      return finalAddr;
+      return setAccountState(acc);
     } catch (err) {
       console.error('Wallet connect error:', err);
       const fallbackAcc = getStoredAccount();
-      setAddress(fallbackAcc.address);
-      setGlAccount(fallbackAcc);
-      return fallbackAcc.address;
+      return setAccountState(fallbackAcc);
     }
-  }, []);
+  }, [setAccountState]);
 
   // Switch wallet by custom Private Key
   const switchAccount = (privateKeyHex) => {
     try {
       const formattedPk = privateKeyHex.trim();
       const acc = getStoredAccount(formattedPk);
-      setAddress(acc.address);
-      setGlAccount(acc);
-      return acc.address;
+      return setAccountState(acc);
     } catch (e) {
       console.error('Invalid private key:', e);
       throw new Error('Invalid Private Key. Must be a 32-byte hex string starting with 0x.');
     }
   };
 
-  // Reset to StudioNet Account 0
+  // Reset to StudioNet Account 0 (0x8aB6...ea13)
   const resetToDefaultWallet = () => {
     try {
       localStorage.removeItem('genlayer_warrantyshield_pk');
     } catch (e) {}
     const defaultAcc = createAccount(STUDIONET_DEFAULT_PK);
-    setAddress(defaultAcc.address);
-    setGlAccount(defaultAcc);
-    return defaultAcc.address;
+    return setAccountState(defaultAcc);
   };
 
-  // Generate a brand new wallet address
+  // Generate a brand new keypair and persist
   const generateNewWallet = () => {
     const acc = createAccount();
     if (acc && acc.privateKey) {
@@ -165,11 +162,10 @@ export function useWarrantyShield() {
         localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
       } catch (e) {}
     }
-    setAddress(acc.address);
-    setGlAccount(acc);
-    return acc.address;
+    return setAccountState(acc);
   };
 
+  // Read Contract State
   const fetchClaimsState = useCallback(async () => {
     if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') return;
     setLoading(true);
@@ -212,12 +208,11 @@ export function useWarrantyShield() {
     }
   }, []);
 
-  // Create Warranty Escrow
+  // Write: Create Warranty Purchase Escrow
   const createWarrantyEscrow = async (sellerAddress, policyUrl, amountGen) => {
-    let currentAccount = glAccount || getStoredAccount();
+    const activeAccount = glAccount || getStoredAccount();
     if (!glAccount) {
-      setGlAccount(currentAccount);
-      setAddress(currentAccount.address);
+      setAccountState(activeAccount);
     }
     if (!CONTRACT_ADDRESS) {
       throw new Error('Contract address not configured');
@@ -229,7 +224,7 @@ export function useWarrantyShield() {
     setTxStatus(`Creating warranty escrow deposit of ${amountGen} GEN...`);
 
     try {
-      const client = getWriteClient(currentAccount);
+      const client = getWriteClient(activeAccount);
       const valueWei = parseGen(amountGen);
       
       const hash = await client.writeContract({
@@ -263,12 +258,11 @@ export function useWarrantyShield() {
     }
   };
 
-  // File Claim & Audit
+  // Write: File Claim & AI Defect Audit
   const fileClaimAndAudit = async (claimId, evidenceUrl) => {
-    let currentAccount = glAccount || getStoredAccount();
+    const activeAccount = glAccount || getStoredAccount();
     if (!glAccount) {
-      setGlAccount(currentAccount);
-      setAddress(currentAccount.address);
+      setAccountState(activeAccount);
     }
     if (!CONTRACT_ADDRESS) {
       throw new Error('Contract address not configured');
@@ -280,7 +274,7 @@ export function useWarrantyShield() {
     setTxStatus(`Submitting defect evidence for claim #${claimId}...`);
 
     try {
-      const client = getWriteClient(currentAccount);
+      const client = getWriteClient(activeAccount);
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'file_claim_and_audit',
@@ -311,12 +305,11 @@ export function useWarrantyShield() {
     }
   };
 
-  // Release to Seller
+  // Write: Manual Release to Seller
   const releaseToSeller = async (claimId) => {
-    let currentAccount = glAccount || getStoredAccount();
+    const activeAccount = glAccount || getStoredAccount();
     if (!glAccount) {
-      setGlAccount(currentAccount);
-      setAddress(currentAccount.address);
+      setAccountState(activeAccount);
     }
     if (!CONTRACT_ADDRESS) {
       throw new Error('Contract address not configured');
@@ -328,7 +321,7 @@ export function useWarrantyShield() {
     setTxStatus(`Releasing escrow funds to seller for claim #${claimId}...`);
 
     try {
-      const client = getWriteClient(currentAccount);
+      const client = getWriteClient(activeAccount);
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'release_to_seller',
@@ -359,7 +352,7 @@ export function useWarrantyShield() {
     }
   };
 
-  // Fetch initial claims data on mount without triggering wallet popup
+  // Fetch initial claims data on mount
   useEffect(() => {
     if (CONTRACT_ADDRESS && CONTRACT_ADDRESS !== '0x0000000000000000000000000000000000000000') {
       fetchClaimsState();
