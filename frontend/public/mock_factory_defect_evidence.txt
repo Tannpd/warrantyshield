@@ -1,0 +1,12 @@
+CUSTOMER DEFECT EVIDENCE REPORT (CONFIRMED FACTORY DOA DEFECT)
+--------------------------------------------------------------
+Customer Order Ref: #WAR-00892
+Device Serial: SN-CYBER-9912-OLED
+
+Unboxing & Diagnostic Findings:
+- Unboxing video timestamp: 2026-07-26 10:15 UTC.
+- Sealed factory packaging opened on video without external box damage.
+- Upon first power-on, OLED display exhibited 18 vertical dead pixel lines across left panel.
+- No physical impact marks, screen glass intact, liquid contact indicators show 100% white (dry).
+
+Hardware Auditor Verdict: Clear factory manufacturing defect out of box. Eligible for 100% full buyer refund.

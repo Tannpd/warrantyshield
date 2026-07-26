@@ -1,0 +1,12 @@
+CUSTOMER DEFECT EVIDENCE REPORT (USER PHYSICAL DAMAGE DETECTED)
+--------------------------------------------------------------
+Customer Order Ref: #WAR-00892
+Device Serial: SN-CYBER-9912-OLED
+
+Diagnostic Findings:
+- Device reported unusable after 5 days of receipt.
+- Physical inspection reveals chassis bottom plate is dented from impact.
+- Internal Liquid Contact Sensor (LCI) near charging port turned bright red (water submersion confirmed).
+- Water droplets found inside thermal heatpipe module.
+
+Hardware Auditor Verdict: User-inflicted liquid submersion & physical impact damage. Excluded from factory warranty. Funds released to seller.

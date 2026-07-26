@@ -1,0 +1,9 @@
+OFFICIAL MANUFACTURER HARDWARE WARRANTY POLICY
+----------------------------------------------
+Product Line: ProTech CyberStation 16 OLED Laptop
+Policy Identifier: WAR-2026-NEXUS
+Coverage Period: 12 Months Out-of-Box Factory Hardware Warranty
+
+Warranty Coverage Terms:
+1. Full replacement/refund is guaranteed for Dead-On-Arrival (DOA) motherboard failure, burnt power IC, defective battery cells, or screen dead pixels (>3 dead pixels out of box).
+2. EXCLUSIONS: Warranty does NOT cover physical drops, cracked chassis from impact, water submersion, liquid contact sensor tripping, or unauthorized third-party disassembly.
