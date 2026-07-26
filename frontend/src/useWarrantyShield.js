@@ -114,6 +114,32 @@ export function useWarrantyShield() {
     }
   }, []);
 
+  // Switch wallet by custom Private Key
+  const switchAccount = (privateKeyHex) => {
+    try {
+      const formattedPk = privateKeyHex.trim();
+      const acc = createAccount(formattedPk);
+      localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+      setAddress(acc.address);
+      setGlAccount(acc);
+      return acc.address;
+    } catch (e) {
+      console.error('Invalid private key:', e);
+      throw new Error('Invalid Private Key. Must be a 32-byte hex string starting with 0x.');
+    }
+  };
+
+  // Generate a brand new wallet address
+  const generateNewWallet = () => {
+    const acc = createAccount();
+    if (acc && acc.privateKey) {
+      localStorage.setItem('genlayer_warrantyshield_pk', acc.privateKey);
+    }
+    setAddress(acc.address);
+    setGlAccount(acc);
+    return acc.address;
+  };
+
   const fetchClaimsState = useCallback(async () => {
     if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') return;
     setLoading(true);
@@ -320,6 +346,8 @@ export function useWarrantyShield() {
     txHash,
     txStatus,
     connectWallet,
+    switchAccount,
+    generateNewWallet,
     fetchClaimsState,
     createWarrantyEscrow,
     fileClaimAndAudit,

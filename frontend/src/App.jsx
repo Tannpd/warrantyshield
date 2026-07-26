@@ -21,7 +21,9 @@ import {
   Shield,
   RotateCcw,
   XCircle,
-  Award
+  Award,
+  Key,
+  Repeat
 } from 'lucide-react';
 
 export default function App() {
@@ -34,6 +36,8 @@ export default function App() {
     txHash,
     txStatus,
     connectWallet,
+    switchAccount,
+    generateNewWallet,
     fetchClaimsState,
     createWarrantyEscrow,
     fileClaimAndAudit,
@@ -43,6 +47,8 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState('LANDING'); // LANDING, CREATE, CLAIMS
   const [selectedClaimId, setSelectedClaimId] = useState(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [customPkInput, setCustomPkInput] = useState('');
   
   // Form inputs
   const [sellerInput, setSellerInput] = useState('0x3523C5E98EC441F2C619c968fF6eA92e3D0ba34');
@@ -92,6 +98,18 @@ export default function App() {
       await releaseToSeller(selectedClaimId);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSwitchPk = (e) => {
+    e.preventDefault();
+    if (!customPkInput) return;
+    try {
+      switchAccount(customPkInput);
+      setCustomPkInput('');
+      setShowWalletModal(false);
+    } catch (err) {
+      alert(err.message || 'Invalid Private Key');
     }
   };
 
@@ -147,9 +165,14 @@ export default function App() {
           </div>
 
           {address ? (
-            <div style={{ background: 'var(--primary-cyan-dim)', border: '1px solid rgba(0, 240, 255, 0.3)', borderRadius: '10px', padding: '8px 16px', color: '#FFF', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div 
+              onClick={() => setShowWalletModal(true)}
+              style={{ background: 'var(--primary-cyan-dim)', border: '1px solid rgba(0, 240, 255, 0.3)', borderRadius: '10px', padding: '8px 16px', color: '#FFF', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+              title="Click to Switch Wallet or Import Private Key"
+            >
               <Wallet size={16} color="var(--primary-cyan)" />
               {address.slice(0, 6)}...{address.slice(-4)}
+              <Repeat size={14} color="var(--text-muted)" />
             </div>
           ) : (
             <button onClick={connectWallet} className="btn-primary" style={{ width: 'auto', padding: '10px 20px', fontSize: '14px' }}>
@@ -159,6 +182,65 @@ export default function App() {
           )}
         </div>
       </header>
+
+      {/* Wallet Switcher Modal */}
+      {showWalletModal && (
+        <div className="modal-overlay">
+          <div className="loading-modal-card" style={{ maxWidth: '540px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '20px', color: '#FFF', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Key size={20} color="var(--primary-cyan)" />
+                Wallet Account Switcher
+              </h3>
+              <button onClick={() => setShowWalletModal(false)} className="preset-btn" style={{ background: 'transparent', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <div style={{ background: '#0D131F', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px 18px', textAlign: 'left', marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>CURRENT CONNECTED ADDRESS</div>
+              <div style={{ fontSize: '13px', color: 'var(--primary-cyan)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginTop: '4px' }}>
+                {address || 'Not Connected'}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+              <button 
+                onClick={() => { generateNewWallet(); setShowWalletModal(false); }}
+                className="preset-btn preset-btn-emerald" 
+                style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px' }}
+              >
+                <Sparkles size={16} />
+                + Generate Brand New Wallet Keypair
+              </button>
+
+              <button 
+                onClick={() => { switchAccount('0x8b3a350cf5c34c9194ca85829a2df0ec3153be0318b5e2d3348e872092edffba'); setShowWalletModal(false); }}
+                className="preset-btn" 
+                style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px', background: '#0D131F', color: '#FFF', border: '1px solid var(--border-color)' }}
+              >
+                Switch to StudioNet Default Admin Wallet
+              </button>
+            </div>
+
+            <form onSubmit={handleSwitchPk} style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', textAlign: 'left' }}>
+              <div className="form-group">
+                <label className="form-label">IMPORT CUSTOM PRIVATE KEY (32-BYTE HEX 0x...)</label>
+                <input 
+                  type="password" 
+                  placeholder="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" 
+                  value={customPkInput}
+                  onChange={(e) => setCustomPkInput(e.target.value)}
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn-primary" style={{ padding: '12px', fontSize: '14px' }}>
+                Import & Switch Wallet Account
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modern Web3 Full-Screen Loading Modal Overlay */}
       {loading && (
@@ -640,9 +722,17 @@ export default function App() {
                                   <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
                                     READ-ONLY ESCROW VIEW
                                   </div>
-                                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '14px' }}>
                                     Only the registered Buyer (<code className="code-tag">{selectedClaim.buyer.slice(0, 6)}...{selectedClaim.buyer.slice(-4)}</code>) can submit defect claims or release funds for this escrow.
                                   </div>
+                                  <button 
+                                    onClick={() => setShowWalletModal(true)}
+                                    className="preset-btn preset-btn-emerald"
+                                    style={{ margin: '0 auto' }}
+                                  >
+                                    <Repeat size={14} />
+                                    Switch Wallet to Buyer ({selectedClaim.buyer.slice(0, 6)}...)
+                                  </button>
                                 </div>
                               )}
                             </div>
