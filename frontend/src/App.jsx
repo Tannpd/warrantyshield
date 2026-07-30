@@ -46,6 +46,8 @@ export default function App() {
   
   // Form inputs
   const [sellerInput, setSellerInput] = useState('0x3523C5E98EC441F2C619c968fF6eA92e3D0ba34');
+  const [productIdInput, setProductIdInput] = useState('PRD-MACBOOK-M3-001');
+  const [saleIdInput, setSaleIdInput] = useState('SALE-2026-88492');
   const [policyUrlInput, setPolicyUrlInput] = useState('https://warrantyshield-app.vercel.app/mock_warranty_policy.txt');
   const [amountInput, setAmountInput] = useState('5.0');
   const [evidenceUrlInput, setEvidenceUrlInput] = useState('');
@@ -61,10 +63,12 @@ export default function App() {
 
   const handleCreateEscrow = async (e) => {
     e.preventDefault();
-    if (!sellerInput || !policyUrlInput || !amountInput) return;
+    if (!sellerInput || !productIdInput || !saleIdInput || !policyUrlInput || !amountInput) return;
     try {
-      await createWarrantyEscrow(sellerInput, policyUrlInput, amountInput);
+      await createWarrantyEscrow(sellerInput, productIdInput, saleIdInput, policyUrlInput, amountInput);
       setSellerInput('0x3523C5E98EC441F2C619c968fF6eA92e3D0ba34');
+      setProductIdInput('PRD-MACBOOK-M3-001');
+      setSaleIdInput('SALE-2026-88492');
       setPolicyUrlInput('https://warrantyshield-app.vercel.app/mock_warranty_policy.txt');
       setAmountInput('5.0');
       setActiveTab('CLAIMS');
@@ -191,6 +195,14 @@ export default function App() {
                 <span>3. Re-executing validator nodes for fail-closed consensus</span>
               </div>
             </div>
+
+            {address && (
+              <div style={{ background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.25)', borderRadius: '10px', padding: '10px 14px', margin: '14px 0 6px 0', fontSize: '13px', color: '#FFF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <Wallet size={16} color="var(--primary-cyan)" />
+                <span>SIGNER (METAMASK WRITER):</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--primary-cyan)' }}>{address}</span>
+              </div>
+            )}
 
             {txHash && (
               <div className="loading-tx-hash">
@@ -363,6 +375,32 @@ export default function App() {
                     />
                   </div>
 
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">SELLER-APPROVED PRODUCT ID</label>
+                      <input 
+                        type="text" 
+                        placeholder="PRD-MACBOOK-M3-001" 
+                        value={productIdInput}
+                        onChange={(e) => setProductIdInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">SELLER-APPROVED SALE / ORDER ID</label>
+                      <input 
+                        type="text" 
+                        placeholder="SALE-2026-88492" 
+                        value={saleIdInput}
+                        onChange={(e) => setSaleIdInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label">OFFICIAL MANUFACTURER WARRANTY POLICY URL</label>
                     <input 
@@ -475,7 +513,7 @@ export default function App() {
                         </div>
 
                         {/* Detail Info Grid */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                           <div style={{ background: '#0D131F', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px 18px' }}>
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>BUYER WALLET</div>
                             <div style={{ fontSize: '12px', color: '#FFF', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{selectedClaim.buyer.slice(0, 6)}...{selectedClaim.buyer.slice(-4)}</div>
@@ -491,6 +529,19 @@ export default function App() {
                             <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--primary-cyan)', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>
                               {formatGen(selectedClaim.amount)} GEN
                             </div>
+                          </div>
+                        </div>
+
+                        {/* Product & Sale ID Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+                          <div style={{ background: '#0D131F', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px 18px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>BOUND PRODUCT ID</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFF', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{selectedClaim.product_id || 'N/A'}</div>
+                          </div>
+
+                          <div style={{ background: '#0D131F', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '14px 18px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>BOUND SALE / ORDER ID</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#FFF', fontFamily: 'var(--font-mono)', marginTop: '4px' }}>{selectedClaim.sale_id || 'N/A'}</div>
                           </div>
                         </div>
 

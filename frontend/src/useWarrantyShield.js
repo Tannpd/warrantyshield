@@ -166,7 +166,7 @@ export function useWarrantyShield() {
   }, []);
 
   // Create Warranty Escrow
-  const createWarrantyEscrow = async (sellerAddress, policyUrl, amountGen) => {
+  const createWarrantyEscrow = async (sellerAddress, productId, saleId, policyUrl, amountGen) => {
     let currentAccount = glAccount;
     if (!currentAccount) {
       if (window.ethereum) {
@@ -204,7 +204,7 @@ export function useWarrantyShield() {
       const hash = await client.writeContract({
         address: CONTRACT_ADDRESS,
         functionName: 'create_warranty_escrow',
-        args: [sellerAddress.trim(), policyUrl.trim()],
+        args: [sellerAddress.trim(), productId.trim(), saleId.trim(), policyUrl.trim()],
         value: valueWei,
       });
       

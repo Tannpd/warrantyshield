@@ -48,6 +48,8 @@ class Contract(gl.Contract):
     # Storage Mappings (Pre-initialized by VM)
     claim_buyer:           TreeMap[str, Address]
     claim_seller:          TreeMap[str, Address]
+    claim_product_id:      TreeMap[str, str]
+    claim_sale_id:         TreeMap[str, str]
     claim_amount:          TreeMap[str, bigint]
     claim_status:          TreeMap[str, str]       # "ACTIVE", "REFUNDED", "RELEASED", "FAILED"
     claim_policy_url:      TreeMap[str, str]
@@ -66,10 +68,10 @@ class Contract(gl.Contract):
     # PUBLIC WRITE: CREATE WARRANTY ESCROW (BUYER LOCKS FUNDS)
     # -------------------------------------------------------------------
     @gl.public.write.payable
-    def create_warranty_escrow(self, seller: str, policy_url: str) -> int:
+    def create_warranty_escrow(self, seller: str, product_id: str, sale_id: str, policy_url: str) -> int:
         """
         Creates a new warranty escrow vault. The buyer deposits GEN purchase funds
-        and binds the official manufacturer warranty policy URL on-chain.
+        and binds the seller-approved product ID, sale ID, and manufacturer warranty policy URL on-chain.
         """
         amount = gl.message.value
         if amount <= bigint(0):
@@ -77,6 +79,12 @@ class Contract(gl.Contract):
 
         if len(seller.strip()) == 0:
             raise UserError("Seller address cannot be empty.")
+
+        if len(product_id.strip()) == 0:
+            raise UserError("Seller-approved product ID cannot be empty.")
+
+        if len(sale_id.strip()) == 0:
+            raise UserError("Seller-approved sale ID cannot be empty.")
 
         if len(policy_url.strip()) == 0:
             raise UserError("Manufacturer warranty policy URL cannot be empty.")
@@ -92,6 +100,8 @@ class Contract(gl.Contract):
 
         self.claim_buyer[cid_str] = buyer
         self.claim_seller[cid_str] = seller_addr
+        self.claim_product_id[cid_str] = product_id.strip()
+        self.claim_sale_id[cid_str] = sale_id.strip()
         self.claim_amount[cid_str] = amount
         self.claim_status[cid_str] = "ACTIVE"
         self.claim_policy_url[cid_str] = policy_url.strip()
@@ -134,6 +144,8 @@ class Contract(gl.Contract):
             raise UserError("Only the buyer can file a warranty claim for this escrow.")
 
         official_policy_url = self.claim_policy_url.get(cid_str, "")
+        product_id = self.claim_product_id.get(cid_str, "")
+        sale_id = self.claim_sale_id.get(cid_str, "")
 
         # Update status
         self.claim_evidence_url[cid_str] = evidence_url.strip()
@@ -190,8 +202,11 @@ class Contract(gl.Contract):
             # 3. AI Senior Hardware Auditor Prompt
             prompt = f"""You are a Senior Hardware Quality & Warranty Auditor for an e-commerce escrow protocol called WarrantyShield.
 Your job is to analyze customer unboxing logs, defect photos/video descriptions, and diagnostic reports, comparing them against the official manufacturer warranty policy.
+You must verify that the policy and diagnostic material correspond to the seller-approved product (Product ID: {product_id}) and sale (Sale ID: {sale_id}).
 You must distinguish between a genuine "Factory Defect" (e.g., dead pixels, DOA motherboard, burnt power IC, defective battery cell out of box) versus "User-Inflicted Damage" (e.g., cracked screen from drop, liquid submersion, unauthorized disassembly, water contact sensor tripped).
 
+Seller-Approved Product ID: {product_id}
+Seller-Approved Sale ID: {sale_id}
 Official Warranty Policy URL: {official_policy_url}
 --- START WARRANTY POLICY TEXT ---
 {policy_excerpt}
@@ -203,9 +218,9 @@ Customer Defect Evidence URL: {evidence_url}
 --- END DEFECT EVIDENCE TEXT ---
 
 Evaluate:
-1. Is there clear evidence of a genuine factory hardware defect covered by the warranty policy?
+1. Is there clear evidence of a genuine factory hardware defect covered by the warranty policy for the specified product ({product_id}) and sale ({sale_id})?
 2. Estimate a "fault_score" from 0 to 100 (where 0 means 100% user damage/no defect, and 100 means confirmed catastrophic factory defect).
-3. If "fault_score" is 50 or above, "is_faulty" MUST be true (entitling buyer to full refund). If "fault_score" is below 50, "is_faulty" should be false.
+3. If "fault_score" is 50 or above, "is_faulty" MUST be true (entitling buyer to full refund). If "fault_score" is below 50, "is_faulty" MUST be false.
 4. Write a concise 2-3 sentence authoritative audit reasoning.
 
 Your output MUST be a single, valid JSON object with EXACTLY the following keys:
@@ -253,15 +268,14 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
                         "audit_reasoning": "AI Auditor verdict contained a non-boolean value for is_faulty."
                     })
 
-                is_faulty = raw_faulty
                 score = int(parsed.get("fault_score", 0))
                 reasoning = str(parsed.get("audit_reasoning", "No audit details.")).strip()
 
                 if score < 0: score = 0
                 if score > 100: score = 100
 
-                if score >= 50:
-                    is_faulty = True
+                # STRICT ENFORCEMENT: Payout verdict (is_faulty) MUST strictly match score threshold (>= 50)
+                is_faulty = (score >= 50)
 
                 return json.dumps({
                     "is_faulty": is_faulty,
@@ -303,6 +317,11 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
             if not isinstance(leader_faulty_raw, bool):
                 return False
 
+            # STRICT SCORE THRESHOLD ALIGNMENT CHECK FOR LEADER RESULT
+            leader_score = int(leader_data.get("fault_score", 0))
+            if leader_faulty_raw != (leader_score >= 50):
+                return False
+
             validator_raw = leader_fn()
             try:
                 if isinstance(validator_raw, bytes):
@@ -324,6 +343,11 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
             # STRICT BOOLEAN CHECK FOR VALIDATOR RESULT
             val_faulty_raw = validator_data.get("is_faulty")
             if not isinstance(val_faulty_raw, bool):
+                return False
+
+            # STRICT SCORE THRESHOLD ALIGNMENT CHECK FOR VALIDATOR RESULT
+            val_score = int(validator_data.get("fault_score", 0))
+            if val_faulty_raw != (val_score >= 50):
                 return False
 
             return leader_faulty_raw == val_faulty_raw
@@ -359,8 +383,12 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
             self.claim_reasoning[cid_str] = "Audit Failed: Invalid non-boolean value for is_faulty in settlement path."
             return
 
-        is_faulty = settle_faulty_raw
         score = int(res.get("fault_score", 0))
+        if score < 0: score = 0
+        if score > 100: score = 100
+
+        # STRICT ENFORCEMENT: Payout verdict (is_faulty) MUST strictly match score threshold (>= 50)
+        is_faulty = (score >= 50)
         reasoning = str(res.get("audit_reasoning", "Audit complete."))
 
         self.claim_is_faulty[cid_str] = is_faulty
@@ -437,6 +465,8 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
 
         buyer = to_address(self.claim_buyer.get(cid_str, Address("0x0000000000000000000000000000000000000000")))
         seller = to_address(self.claim_seller.get(cid_str, Address("0x0000000000000000000000000000000000000000")))
+        product_id = self.claim_product_id.get(cid_str, "")
+        sale_id = self.claim_sale_id.get(cid_str, "")
         amount = self.claim_amount.get(cid_str, bigint(0))
         status = self.claim_status.get(cid_str, "ACTIVE")
         policy_url = self.claim_policy_url.get(cid_str, "")
@@ -449,6 +479,8 @@ Do NOT wrap the JSON in markdown code blocks. Return ONLY raw JSON."""
             "id": claim_id,
             "buyer": str(buyer),
             "seller": str(seller),
+            "product_id": product_id,
+            "sale_id": sale_id,
             "amount": int(amount),
             "status": status,
             "policy_url": policy_url,
