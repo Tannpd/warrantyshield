@@ -1,5 +1,7 @@
 CUSTOMER DEFECT EVIDENCE REPORT (USER PHYSICAL DAMAGE DETECTED)
 --------------------------------------------------------------
+Seller-Approved Product ID: PRD-MACBOOK-M3-001
+Seller-Approved Sale ID: SALE-2026-88492
 Customer Order Ref: #WAR-00892
 Device Serial: SN-CYBER-9912-OLED
 
