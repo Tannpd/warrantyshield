@@ -86,22 +86,24 @@ When buyers purchase expensive electronics online (GPUs, Laptops, Smartphones, D
 ### 🔒 Key Contract Rules & Safety Compliance
 1. **Product & Sale ID Binding**:
    - `create_warranty_escrow()` stores and validates `product_id` and `sale_id` state mappings (`TreeMap[str, str]`), ensuring evidence reports cannot be reused across different orders.
-2. **Strict Score Threshold Matching**:
+2. **Authorized Domain Origin Enforcement**:
+   - `file_claim_and_audit()` strictly enforces `evidence_url.startswith("https://warrantyshield-app.vercel.app/")`. Any arbitrary self-hosted fake URL (e.g. `https://fake-hacker-site.com/report.txt`) is rejected on-chain, preventing fake report creation.
+3. **Strict Score Threshold Matching**:
    - Enforces payout verdict matching: `is_faulty = (score >= 50)` in Leader, Validator, and Settlement execution paths. Rejects mismatched raw LLM booleans.
-3. **Strict Boolean Type Validation**:
+4. **Strict Boolean Type Validation**:
    - Evaluates `isinstance(raw_faulty, bool)` in all consensus paths to prevent string coercion exploits (e.g. `"false"`).
-4. **Fail-Closed Consensus Security**:
+5. **Fail-Closed Consensus Security**:
    - If web fetching or LLM execution fails, `validator_fn` returns `False`, causing consensus to fail closed without clearing escrow balances.
-5. **Backend API Key Security**:
+6. **Backend API Key Security**:
    - Layer 1 Vision AI requests pass through `/api/analyze-vision` serverless backend proxy, keeping Google Gemini API keys 100% hidden from client-side code and browser F12 inspection.
-6. **Access Control & Signer Visibility**:
+7. **Access Control & Signer Visibility**:
    - Only the registered buyer (`sender == claim_buyer`) can file claims or trigger manual releases. Active MetaMask Signer is displayed during write transactions.
 
 ---
 
 ## 🧪 Automated Unit Test Verification
 
-The contract includes a complete `unittest` test suite covering all 8 core execution paths:
+The contract includes a complete `unittest` test suite covering all 9 core execution paths:
 
 ```powershell
 # Run unit tests inside python virtual environment
@@ -109,13 +111,14 @@ cd D:\Gen\WarrantyShield
 .venv\Scripts\python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-### Test Results Summary (8/8 Passed):
+### Test Results Summary (9/9 Passed):
 * `test_create_warranty_escrow_payable`: **OK** (Locks deposit & binds product ID, sale ID & policy URL).
 * `test_file_claim_factory_defect_refunds_buyer`: **OK** (Factory DOA triggers 100% refund).
 * `test_file_claim_user_damage_releases_to_seller`: **OK** (User physical damage releases to seller).
+* `test_unauthorized_evidence_domain_rejected`: **OK** (Arbitrary fake URLs are rejected on-chain).
 * `test_payout_verdict_strictly_matches_score_threshold`: **OK** (Forces `is_faulty = False` when `score < 50`).
 * `test_release_to_seller_buyer_only`: **OK** (Access control enforces buyer-only release).
-* `test_failed_fetch_does_not_release_escrow`: **OK** (Fail-closed safety preserves escrow on fetch error).
+* `test_failed_fetch_does_not_refund`: **OK** (Fail-closed safety preserves escrow on fetch error).
 * `test_strict_boolean_validation_rejects_string`: **OK** (String `"false"` is rejected).
 * `test_reproducible_compilation`: **OK** (GenVM contract compilation verified).
 
