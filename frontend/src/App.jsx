@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  useWarrantyShield, 
-  formatGen 
-} from './useWarrantyShield';
+import { useWarrantyShield, formatGen } from './useWarrantyShield';
+import { analyzeUnboxingImage } from './geminiVision';
+import { generateEvidenceReportUrl } from './reportGenerator';
 import { 
   ShieldCheck, 
   Wallet, 
@@ -21,7 +20,11 @@ import {
   Shield,
   RotateCcw,
   XCircle,
-  Award
+  Award,
+  Eye,
+  Camera,
+  FileText,
+  Upload
 } from 'lucide-react';
 
 export default function App() {
@@ -41,7 +44,7 @@ export default function App() {
     contractAddress
   } = useWarrantyShield();
 
-  const [activeTab, setActiveTab] = useState('LANDING'); // LANDING, CREATE, CLAIMS
+  const [activeTab, setActiveTab] = useState('LANDING'); // LANDING, CREATE, CLAIMS, VISION
   const [selectedClaimId, setSelectedClaimId] = useState(null);
   
   // Form inputs
@@ -51,6 +54,14 @@ export default function App() {
   const [policyUrlInput, setPolicyUrlInput] = useState('https://warrantyshield-app.vercel.app/mock_warranty_policy.txt');
   const [amountInput, setAmountInput] = useState('5.0');
   const [evidenceUrlInput, setEvidenceUrlInput] = useState('');
+
+  // Layer 1 Vision AI Inspector States
+  const [visionImage, setVisionImage] = useState(null);
+  const [visionImagePreview, setVisionImagePreview] = useState('');
+  const [visionLoading, setVisionLoading] = useState(false);
+  const [visionResult, setVisionResult] = useState('');
+  const [generatedReportUrl, setGeneratedReportUrl] = useState('');
+  const [visionApiKeyInput, setVisionApiKeyInput] = useState(import.meta.env.VITE_GEMINI_API_KEY || '');
 
   const selectedClaim = claims.find(c => Number(c.id) === Number(selectedClaimId));
 
@@ -86,6 +97,50 @@ export default function App() {
       setEvidenceUrlInput('');
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setVisionImage({ base64: reader.result, mimeType: file.type });
+        setVisionImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAnalyzeVision = async (e) => {
+    e.preventDefault();
+    if (!visionImagePreview) return;
+    setVisionLoading(true);
+    setVisionResult('');
+    setGeneratedReportUrl('');
+    try {
+      const resultText = await analyzeUnboxingImage({
+        imageBase64: visionImagePreview,
+        mimeType: visionImage?.mimeType || 'image/jpeg',
+        productId: productIdInput,
+        saleId: saleIdInput,
+        apiKey: visionApiKeyInput
+      });
+      setVisionResult(resultText);
+      const url = generateEvidenceReportUrl(resultText);
+      setGeneratedReportUrl(url);
+    } catch (err) {
+      console.error('Vision analysis error:', err);
+      setVisionResult(`Analysis Error: ${err.message}`);
+    } finally {
+      setVisionLoading(false);
+    }
+  };
+
+  const handleUseGeneratedReport = () => {
+    if (generatedReportUrl) {
+      setEvidenceUrlInput(generatedReportUrl);
+      setActiveTab('CLAIMS');
     }
   };
 
@@ -133,6 +188,14 @@ export default function App() {
               className={`nav-link ${activeTab === 'CREATE' ? 'active' : ''}`}
             >
               Create Escrow
+            </button>
+            <button 
+              onClick={() => setActiveTab('VISION')}
+              className={`nav-link ${activeTab === 'VISION' ? 'active' : ''}`}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Eye size={14} color="var(--primary-cyan)" />
+              Vision AI Inspector
             </button>
             <button 
               onClick={() => {
@@ -359,7 +422,7 @@ export default function App() {
                   Create Warranty Purchase Escrow
                 </div>
                 <p className="panel-desc">
-                  Lock purchase deposit into a smart escrow vault bound with the seller's address and the official manufacturer warranty policy URL.
+                  Lock purchase deposit into a smart escrow vault bound with the seller's address, Product ID, Sale ID, and official warranty policy URL.
                 </p>
 
                 <form onSubmit={handleCreateEscrow}>
@@ -445,7 +508,135 @@ export default function App() {
             </div>
           )}
 
-          {/* Tab 2: CLAIMS VAULT */}
+          {/* Tab 2: VISION AI INSPECTOR (LAYER 1 OFF-CHAIN) */}
+          {activeTab === 'VISION' && (
+            <div style={{ maxWidth: '780px', margin: '0 auto' }}>
+              <div className="glass-panel">
+                <div className="panel-title">
+                  <Eye size={22} color="var(--primary-cyan)" />
+                  Layer 1: Off-Chain Vision AI Inspector (Google Gemini Pro)
+                </div>
+                <p className="panel-desc">
+                  Upload an unboxing photo or video frame. Google Gemini Vision AI scans real hardware features (OLED dead pixels, water contact sensors, factory seals) and generates a verifiable Diagnostic Evidence Audit URL for GenLayer VM consensus.
+                </p>
+
+                <form onSubmit={handleAnalyzeVision}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">BOUND PRODUCT ID</label>
+                      <input 
+                        type="text" 
+                        value={productIdInput}
+                        onChange={(e) => setProductIdInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">BOUND SALE / ORDER ID</label>
+                      <input 
+                        type="text" 
+                        value={saleIdInput}
+                        onChange={(e) => setSaleIdInput(e.target.value)}
+                        className="form-input"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">UPLOAD UNBOXING PHOTO / VIDEO FRAME</label>
+                    <div style={{ border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '24px', textAlign: 'center', background: '#0D131F', cursor: 'pointer', position: 'relative' }}>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageUpload}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      />
+                      {visionImagePreview ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                          <img src={visionImagePreview} alt="Unboxing Preview" style={{ maxHeight: '200px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border-color)' }} />
+                          <span style={{ fontSize: '12px', color: 'var(--primary-cyan)' }}>Click or drop to replace image</span>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                          <Upload size={32} color="var(--primary-cyan)" />
+                          <span style={{ fontSize: '14px', color: '#FFF', fontWeight: 600 }}>Click or Drag & Drop Unboxing Photo / Frame</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Supports JPG, PNG, WEBP</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">GOOGLE GEMINI API KEY</label>
+                    <input 
+                      type="password" 
+                      placeholder="Enter Gemini API Key (starts with AIzaSy...)" 
+                      value={visionApiKeyInput}
+                      onChange={(e) => setVisionApiKeyInput(e.target.value)}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <button type="submit" className="btn-primary" disabled={visionLoading || !visionImagePreview}>
+                    {visionLoading ? (
+                      <>
+                        <RefreshCw size={18} className="animate-spin" />
+                        Scanning Hardware Features with Gemini Vision AI...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        Inspect Photo with Gemini Vision AI (Layer 1)
+                      </>
+                    )}
+                  </button>
+                </form>
+
+                {/* Inspection Result Box */}
+                {visionResult && (
+                  <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary-cyan)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                      <FileText size={16} />
+                      GEMINI VISION AI DIAGNOSTIC AUDIT LOG
+                    </div>
+                    <pre style={{ background: '#0D131F', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px', fontSize: '13px', color: '#E2E8F0', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)', lineHeight: '20px' }}>
+                      {visionResult}
+                    </pre>
+
+                    {generatedReportUrl && (
+                      <div style={{ marginTop: '16px', background: 'rgba(0, 240, 255, 0.08)', border: '1px solid rgba(0, 240, 255, 0.3)', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700, color: '#FFF' }}>
+                          GENERATED DIAGNOSTIC EVIDENCE REPORT URL (FOR GENLAYER VM):
+                        </div>
+                        <a 
+                          href={generatedReportUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ fontSize: '12px', color: 'var(--primary-cyan)', wordBreak: 'break-all', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}
+                        >
+                          {generatedReportUrl}
+                          <ExternalLink size={14} />
+                        </a>
+
+                        <button 
+                          onClick={handleUseGeneratedReport}
+                          className="btn-primary" 
+                          style={{ width: 'auto', alignSelf: 'flex-start', padding: '8px 16px', fontSize: '13px' }}
+                        >
+                          <CheckCircle2 size={16} />
+                          Auto-Fill Evidence URL into Claims Vault
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 3: CLAIMS VAULT */}
           {activeTab === 'CLAIMS' && (
             <div>
               {claims.length === 0 ? (
