@@ -34,6 +34,7 @@ export default function App() {
     contractBalance,
     loading,
     error,
+    setError,
     txHash,
     txStatus,
     connectWallet,
@@ -445,9 +446,30 @@ export default function App() {
           </div>
 
           {error && (
-            <div style={{ background: 'rgba(244, 63, 94, 0.12)', border: '1px solid rgba(244, 63, 94, 0.4)', borderRadius: '12px', padding: '16px 20px', color: '#FDA4AF', fontSize: '13px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <AlertCircle size={18} color="var(--rose-slash)" />
-              <span>{error}</span>
+            <div style={{ 
+              background: 'rgba(244, 63, 94, 0.12)', 
+              border: '1px solid rgba(244, 63, 94, 0.4)', 
+              borderRadius: '12px', 
+              padding: '14px 20px', 
+              color: '#FDA4AF', 
+              fontSize: '13px', 
+              marginBottom: '24px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+                <AlertCircle size={18} color="var(--rose-slash)" style={{ flexShrink: 0 }} />
+                <span style={{ lineHeight: '20px' }}>{error}</span>
+              </div>
+              <button 
+                onClick={() => setError && setError('')} 
+                style={{ background: 'none', border: 'none', color: '#FDA4AF', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', opacity: 0.8 }}
+                title="Dismiss message"
+              >
+                <XCircle size={18} />
+              </button>
             </div>
           )}
 

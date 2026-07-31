@@ -86,6 +86,45 @@ export function parseGen(genVal) {
   }
 }
 
+// Helper function to clean up raw Python tracebacks, RPC errors, and format clean user-friendly messages
+export function parseCleanError(err) {
+  if (!err) return '';
+  const msg = typeof err === 'string' ? err : (err.message || String(err));
+  
+  if (msg.includes('User rejected') || msg.includes('user rejected') || msg.includes('User denied')) {
+    return 'Transaction was canceled in your wallet.';
+  }
+  if (msg.includes('insufficient funds')) {
+    return 'Insufficient GEN balance in wallet for gas and transaction value.';
+  }
+  if (msg.includes('Server busy') || msg.includes('execution slots occupied')) {
+    return 'GenLayer network nodes are currently busy. Please retry in a few seconds.';
+  }
+
+  // Handle Python UserError inside GenLayer Traceback
+  if (msg.includes('UserError:')) {
+    const parts = msg.split('UserError:');
+    let raw = parts[parts.length - 1].trim();
+    if (raw.includes('"')) {
+      raw = raw.split('"')[0].trim();
+    }
+    if (raw.includes('\n')) {
+      raw = raw.split('\n')[0].trim();
+    }
+    if (raw) return raw;
+  }
+
+  // Clean Python Traceback lines
+  if (msg.includes('Traceback')) {
+    const lines = msg.split('\n').filter(line => !line.includes('File "') && !line.includes('Traceback') && !line.includes('^^^') && !line.includes('lambda'));
+    const cleanStr = lines.join(' ').trim();
+    if (cleanStr) return cleanStr.length > 150 ? cleanStr.slice(0, 145) + '...' : cleanStr;
+  }
+
+  const clean = msg.replace(/^Error:\s*/, '').replace(/UserError:\s*/, '').trim();
+  return clean.length > 150 ? clean.slice(0, 145) + '...' : clean;
+}
+
 export function useWarrantyShield() {
   const [address, setAddress] = useState('');
   const [glAccount, setGlAccount] = useState(null);
@@ -95,6 +134,16 @@ export function useWarrantyShield() {
   const [error, setError] = useState('');
   const [txHash, setTxHash] = useState('');
   const [txStatus, setTxStatus] = useState('');
+
+  // Auto clear error banner after 6 seconds
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError('');
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   // Connects directly to user's MetaMask wallet when clicked
   const connectWallet = useCallback(async () => {
@@ -224,7 +273,7 @@ export function useWarrantyShield() {
       return receipt;
     } catch (err) {
       console.error('Escrow creation failed:', err);
-      setError(err.message || 'Transaction failed');
+      setError(parseCleanError(err));
       setTxStatus('Failed');
       throw err;
     } finally {
@@ -288,7 +337,7 @@ export function useWarrantyShield() {
       return receipt;
     } catch (err) {
       console.error('Warranty audit failed:', err);
-      setError(err.message || 'Transaction failed');
+      setError(parseCleanError(err));
       setTxStatus('Failed');
       throw err;
     } finally {
@@ -347,12 +396,12 @@ export function useWarrantyShield() {
         throw new Error(errorMsg);
       }
 
-      setTxStatus('Success! Funds released to seller wallet.');
+      setTxStatus('Success! Escrow funds released to seller.');
       await fetchClaimsState();
       return receipt;
     } catch (err) {
-      console.error('Release failed:', err);
-      setError(err.message || 'Transaction failed');
+      console.error('Manual release failed:', err);
+      setError(parseCleanError(err));
       setTxStatus('Failed');
       throw err;
     } finally {
