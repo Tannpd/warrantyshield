@@ -611,17 +611,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">GOOGLE GEMINI API KEY</label>
-                    <input 
-                      type="password" 
-                      placeholder="Enter Gemini API Key (starts with AIzaSy...)" 
-                      value={visionApiKeyInput}
-                      onChange={(e) => setVisionApiKeyInput(e.target.value)}
-                      className="form-input"
-                    />
-                  </div>
-
                   <button type="submit" className="btn-primary" disabled={visionLoading || !visionImagePreview}>
                     {visionLoading ? (
                       <>
@@ -825,16 +814,36 @@ export default function App() {
                             </div>
 
                             {selectedClaim.evidence_url && (
-                              <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px dashed var(--border-color)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ color: 'var(--text-muted)' }}>UNBOXING / DEFECT EVIDENCE URL:</span>
+                              <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)', fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '11px', letterSpacing: '0.5px' }}>
+                                  UNBOXING / DEFECT EVIDENCE REPORT URL:
+                                </div>
                                 <a 
                                   href={selectedClaim.evidence_url} 
                                   target="_blank" 
                                   rel="noreferrer" 
-                                  style={{ color: 'var(--primary-cyan)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                  style={{ 
+                                    color: 'var(--primary-cyan)', 
+                                    textDecoration: 'none', 
+                                    wordBreak: 'break-all', 
+                                    fontFamily: 'var(--font-mono)', 
+                                    fontSize: '12px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    background: 'rgba(0, 240, 255, 0.05)',
+                                    padding: '8px 12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(0, 240, 255, 0.2)',
+                                    overflow: 'hidden'
+                                  }}
                                 >
-                                  {selectedClaim.evidence_url}
-                                  <ExternalLink size={12} />
+                                  <span style={{ flex: 1, wordBreak: 'break-all' }}>
+                                    {selectedClaim.evidence_url.length > 70 
+                                      ? `${selectedClaim.evidence_url.slice(0, 65)}...` 
+                                      : selectedClaim.evidence_url}
+                                  </span>
+                                  <ExternalLink size={14} style={{ flexShrink: 0 }} />
                                 </a>
                               </div>
                             )}

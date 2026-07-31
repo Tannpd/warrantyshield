@@ -10,13 +10,32 @@ export async function analyzeUnboxingImage({
   saleId = 'SALE-2026-88492',
   apiKey = ''
 }) {
-  const effectiveApiKey = apiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || '';
+  // First try secure backend endpoint (/api/analyze-vision)
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const endpoint = `${origin}/api/analyze-vision`;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64, mimeType, productId, saleId })
+    });
 
-  if (!effectiveApiKey) {
-    throw new Error('Gemini API Key is missing. Please enter your Google Gemini API Key.');
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.result) {
+        return data.result.trim();
+      }
+    }
+  } catch (err) {
+    console.warn('Backend /api/analyze-vision proxy error, trying client fallback:', err);
   }
 
-  // Strip data URL prefix if present
+  // Client-side fallback if backend proxy fails or explicit key provided
+  const effectiveApiKey = apiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || '';
+  if (!effectiveApiKey) {
+    throw new Error('Gemini API Key is missing. Please configure backend GEMINI_API_KEY environment variable.');
+  }
+
   let cleanBase64 = imageBase64;
   if (cleanBase64.includes(',')) {
     cleanBase64 = cleanBase64.split(',')[1];
@@ -50,18 +69,12 @@ Vision AI Hardware Diagnostic Findings:
 Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs user damage>
 `;
 
-  // Active supported Gemini models for generateContent with multimodal input
-  const models = [
-    'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-flash-latest'
-  ];
+  const models = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-flash-latest'];
   let lastError = null;
 
   for (const model of models) {
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveApiKey}`;
-      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -69,12 +82,7 @@ Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs use
           contents: [{
             parts: [
               { text: promptText },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: cleanBase64
-                }
-              }
+              { inline_data: { mime_type: 'image/jpeg', data: cleanBase64 } }
             ]
           }]
         })
@@ -82,23 +90,19 @@ Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs use
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        const errMsg = errJson?.error?.message || `HTTP ${response.status} from ${model}`;
-        console.warn(`Model ${model} failed: ${errMsg}`);
-        lastError = new Error(errMsg);
+        lastError = new Error(errJson?.error?.message || `HTTP ${response.status} from ${model}`);
         continue;
       }
 
       const data = await response.json();
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
       if (!generatedText) {
-        lastError = new Error(`Gemini API model ${model} returned an empty response.`);
+        lastError = new Error(`Gemini API model ${model} returned empty response.`);
         continue;
       }
 
       return generatedText.trim();
     } catch (err) {
-      console.warn(`Gemini Vision API model ${model} error:`, err);
       lastError = err;
     }
   }
