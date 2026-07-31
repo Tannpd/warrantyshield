@@ -100,15 +100,53 @@ export default function App() {
     }
   };
 
-  const handleImageUpload = (e) => {
+  const extractVideoFrame = (file) => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = URL.createObjectURL(file);
+      video.muted = true;
+      video.playsInline = true;
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(1.0, video.duration / 2);
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 360;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(video.src);
+        resolve(base64);
+      };
+      video.onerror = () => reject(new Error('Failed to load video file.'));
+    });
+  };
+
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setVisionImage({ base64: reader.result, mimeType: file.type });
-        setVisionImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      if (file.type.startsWith('video/')) {
+        setVisionLoading(true);
+        try {
+          const frameBase64 = await extractVideoFrame(file);
+          setVisionImage({ base64: frameBase64, mimeType: 'image/jpeg', isVideo: true, fileName: file.name });
+          setVisionImagePreview(frameBase64);
+        } catch (err) {
+          console.error('Error extracting video frame:', err);
+          alert('Could not extract frame from video. Please select an unboxing image or photo frame.');
+        } finally {
+          setVisionLoading(false);
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setVisionImage({ base64: reader.result, mimeType: file.type, isVideo: false, fileName: file.name });
+          setVisionImagePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -545,24 +583,29 @@ export default function App() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">UPLOAD UNBOXING PHOTO / VIDEO FRAME</label>
+                    <label className="form-label">UPLOAD UNBOXING PHOTO OR MP4/WEBM VIDEO</label>
                     <div style={{ border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '24px', textAlign: 'center', background: '#0D131F', cursor: 'pointer', position: 'relative' }}>
                       <input 
                         type="file" 
-                        accept="image/*" 
+                        accept="image/*,video/*" 
                         onChange={handleImageUpload}
                         style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
                       />
                       {visionImagePreview ? (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-                          <img src={visionImagePreview} alt="Unboxing Preview" style={{ maxHeight: '200px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border-color)' }} />
-                          <span style={{ fontSize: '12px', color: 'var(--primary-cyan)' }}>Click or drop to replace image</span>
+                          <img src={visionImagePreview} alt="Unboxing Frame Preview" style={{ maxHeight: '200px', borderRadius: '8px', objectFit: 'contain', border: '1px solid var(--border-color)' }} />
+                          {visionImage?.isVideo && (
+                            <span style={{ background: 'var(--primary-cyan-dim)', border: '1px solid var(--primary-cyan)', color: '#FFF', fontSize: '11px', fontWeight: 700, padding: '4px 10px', borderRadius: '6px' }}>
+                              🎬 VIDEO FRAME EXTRACTED ({visionImage.fileName})
+                            </span>
+                          )}
+                          <span style={{ fontSize: '12px', color: 'var(--primary-cyan)' }}>Click or drop to replace photo/video file</span>
                         </div>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                           <Upload size={32} color="var(--primary-cyan)" />
-                          <span style={{ fontSize: '14px', color: '#FFF', fontWeight: 600 }}>Click or Drag & Drop Unboxing Photo / Frame</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Supports JPG, PNG, WEBP</span>
+                          <span style={{ fontSize: '14px', color: '#FFF', fontWeight: 600 }}>Click or Drag & Drop Unboxing Photo or Video (.mp4 / .webm)</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Supports JPG, PNG, WEBP, MP4, WEBM, MOV (Auto Video Frame Extraction)</span>
                         </div>
                       )}
                     </div>
