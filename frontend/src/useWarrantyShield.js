@@ -91,37 +91,33 @@ export function parseCleanError(err) {
   if (!err) return '';
   const msg = typeof err === 'string' ? err : (err.message || String(err));
   
-  if (msg.includes('User rejected') || msg.includes('user rejected') || msg.includes('User denied')) {
+  if (/user (rejected|denied)/i.test(msg)) {
     return 'Transaction was canceled in your wallet.';
   }
-  if (msg.includes('insufficient funds')) {
+  if (/insufficient funds/i.test(msg)) {
     return 'Insufficient GEN balance in wallet for gas and transaction value.';
   }
-  if (msg.includes('Server busy') || msg.includes('execution slots occupied')) {
+  if (/server busy|execution slots occupied/i.test(msg)) {
     return 'GenLayer network nodes are currently busy. Please retry in a few seconds.';
   }
 
-  // Handle Python UserError inside GenLayer Traceback
-  if (msg.includes('UserError:')) {
-    const parts = msg.split('UserError:');
-    let raw = parts[parts.length - 1].trim();
-    if (raw.includes('"')) {
-      raw = raw.split('"')[0].trim();
-    }
-    if (raw.includes('\n')) {
-      raw = raw.split('\n')[0].trim();
-    }
-    if (raw) return raw;
+  // Extract exact message inside UserError("...") or contract.UserError: ...
+  const match = msg.match(/UserError:\s*["']?([^"\r\n]+)/i);
+  if (match && match[1]) {
+    let extracted = match[1].trim();
+    // Remove any trailing quote or parenthesis
+    extracted = extracted.replace(/^["']|["']\)?$/g, '').trim();
+    if (extracted) return extracted;
   }
 
-  // Clean Python Traceback lines
+  // Clean Python Traceback lines if present
   if (msg.includes('Traceback')) {
-    const lines = msg.split('\n').filter(line => !line.includes('File "') && !line.includes('Traceback') && !line.includes('^^^') && !line.includes('lambda'));
-    const cleanStr = lines.join(' ').trim();
+    const lines = msg.split('\n').filter(l => !l.includes('Traceback') && !l.includes('File "') && !l.includes('^^^') && !l.includes('lambda'));
+    const cleanStr = lines.join(' ').replace(/contract\.UserError:\s*/g, '').trim();
     if (cleanStr) return cleanStr.length > 150 ? cleanStr.slice(0, 145) + '...' : cleanStr;
   }
 
-  const clean = msg.replace(/^Error:\s*/, '').replace(/UserError:\s*/, '').trim();
+  const clean = msg.replace(/UserError:\s*/g, '').trim();
   return clean.length > 150 ? clean.slice(0, 145) + '...' : clean;
 }
 
