@@ -138,6 +138,10 @@ class Contract(gl.Contract):
         if not (url_lower.startswith("http://") or url_lower.startswith("https://")):
             raise UserError("Invalid evidence URL format. Must start with http:// or https://")
 
+        # Enforce Authorized Evidence Domain Origin Protection
+        if not (url_lower.startswith("https://warrantyshield-app.vercel.app/") or url_lower.startswith("http://localhost:5173/")):
+            raise UserError("Unauthorized evidence report domain. Evidence must originate from official WarrantyShield Vision AI platform endpoint.")
+
         buyer = to_address(self.claim_buyer.get(cid_str, Address("0x0000000000000000000000000000000000000000")))
         sender = to_address(gl.message.sender_address)
         if str(sender) != str(buyer):

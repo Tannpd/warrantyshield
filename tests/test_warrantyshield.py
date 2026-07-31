@@ -130,7 +130,7 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-MACBOOK-M3-001"
         sale_id = "SALE-2026-88492"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
         mock_gl.message = MockMessage(sender=buyer, value=5000000000000000000)
 
         cid = self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -154,8 +154,8 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-MACBOOK-M3-001"
         sale_id = "SALE-2026-88492"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
-        ev_url = "https://warrantyshield.vercel.app/mock_factory_defect_evidence.txt"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        ev_url = "https://warrantyshield-app.vercel.app/mock_factory_defect_evidence.txt"
 
         mock_gl.message = MockMessage(sender=buyer, value=3000000000000000000)
         self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -189,8 +189,8 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-DRONE-X"
         sale_id = "SALE-2026-1122"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
-        ev_url = "https://warrantyshield.vercel.app/mock_user_damage_evidence.txt"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        ev_url = "https://warrantyshield-app.vercel.app/mock_user_damage_evidence.txt"
 
         mock_gl.message = MockMessage(sender=buyer, value=4000000000000000000)
         self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -223,8 +223,8 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-PHONE-V2"
         sale_id = "SALE-2026-9900"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
-        ev_url = "https://warrantyshield.vercel.app/mock_evidence.txt"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        ev_url = "https://warrantyshield-app.vercel.app/mock_evidence.txt"
 
         mock_gl.message = MockMessage(sender=buyer, value=1000000000000000000)
         self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -259,8 +259,8 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-TEST"
         sale_id = "SALE-TEST"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
-        ev_url = "https://flaky-server.com/evidence"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        ev_url = "https://warrantyshield-app.vercel.app/api/report?data=test"
 
         mock_gl.message = MockMessage(sender=buyer, value=2000000000000000000)
         self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -283,8 +283,8 @@ class TestWarrantyShield(unittest.TestCase):
         seller = "0x2222222222222222222222222222222222222222"
         product_id = "PRD-TEST"
         sale_id = "SALE-TEST"
-        policy_url = "https://warrantyshield.vercel.app/mock_warranty_policy.txt"
-        ev_url = "https://fake-link.com/evidence"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        ev_url = "https://warrantyshield-app.vercel.app/api/report?data=test"
 
         mock_gl.message = MockMessage(sender=buyer, value=1000000000000000000)
         self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
@@ -306,6 +306,24 @@ class TestWarrantyShield(unittest.TestCase):
 
         # Contract MUST fail closed and set status to FAILED
         self.assertEqual(claim["status"], "FAILED")
+
+    def test_unauthorized_evidence_domain_rejected(self):
+        """Verify that arbitrary self-hosted fake URLs (e.g. fake-hacker-site.com) are rejected by file_claim_and_audit."""
+        buyer = "0x1111111111111111111111111111111111111111"
+        seller = "0x2222222222222222222222222222222222222222"
+        product_id = "PRD-HACK"
+        sale_id = "SALE-HACK"
+        policy_url = "https://warrantyshield-app.vercel.app/mock_warranty_policy.txt"
+        unauthorized_ev_url = "https://fake-hacker-site.com/fake-evidence.txt"
+
+        mock_gl.message = MockMessage(sender=buyer, value=1000000000000000000)
+        self.contract.create_warranty_escrow(seller, product_id, sale_id, policy_url)
+
+        mock_gl.message = MockMessage(sender=buyer)
+        with self.assertRaises(warrantyshield.UserError) as ctx:
+            self.contract.file_claim_and_audit(0, unauthorized_ev_url)
+
+        self.assertIn("Unauthorized evidence report domain", str(ctx.exception))
 
     def test_seller_clean_release(self):
         """Verify buyer can manually release funds to seller for clean items."""
