@@ -12,7 +12,7 @@
 
 ## 📍 Deployed Network & Production Details
 
-* **Intelligent Contract Address (StudioNet)**: [`0x38142bEf0F989De0dEB1d8d58176b3FE440E305C`](https://studio.genlayer.com)
+* **Intelligent Contract Address (StudioNet)**: [`0xF4423Ef14b710e9a9103904F0945805275F9ba9B`](https://studio.genlayer.com)
 * **Live Production dApp**: [https://warrantyshield-app.vercel.app](https://warrantyshield-app.vercel.app)
 * **GitHub Repository**: [https://github.com/Tannpd/warrantyshield](https://github.com/Tannpd/warrantyshield)
 
