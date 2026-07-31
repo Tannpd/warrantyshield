@@ -50,8 +50,12 @@ Vision AI Hardware Diagnostic Findings:
 Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs user damage>
 `;
 
-  // Try gemini-1.5-flash first, fallback to gemini-1.5-pro
-  const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+  // Active supported Gemini models for generateContent with multimodal input
+  const models = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-flash-latest'
+  ];
   let lastError = null;
 
   for (const model of models) {
@@ -67,7 +71,7 @@ Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs use
               { text: promptText },
               {
                 inline_data: {
-                  mime_type: mimeType,
+                  mime_type: 'image/jpeg',
                   data: cleanBase64
                 }
               }
@@ -78,14 +82,18 @@ Hardware Auditor Verdict: <Concise 2-3 sentence verdict on factory defect vs use
 
       if (!response.ok) {
         const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson?.error?.message || `HTTP ${response.status} from ${model}`);
+        const errMsg = errJson?.error?.message || `HTTP ${response.status} from ${model}`;
+        console.warn(`Model ${model} failed: ${errMsg}`);
+        lastError = new Error(errMsg);
+        continue;
       }
 
       const data = await response.json();
       const generatedText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (!generatedText) {
-        throw new Error('Gemini API returned an empty response.');
+        lastError = new Error(`Gemini API model ${model} returned an empty response.`);
+        continue;
       }
 
       return generatedText.trim();
