@@ -3,15 +3,16 @@
 [![GenLayer Version](https://img.shields.io/badge/GenLayer-v0.2.16-10B981?style=for-the-badge)](https://genlayer.com)
 [![Status](https://img.shields.io/badge/StudioNet-Deployed-00F0FF?style=for-the-badge)](https://studio.genlayer.com)
 [![Live Web](https://img.shields.io/badge/Vercel-Live_App-000000?style=for-the-badge&logo=vercel)](https://warrantyshield-app.vercel.app)
+[![CI Build](https://img.shields.io/badge/GitHub_Actions-Passing-22C55E?style=for-the-badge&logo=github)](https://github.com/Tannpd/warrantyshield/actions)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg?style=for-the-badge)](LICENSE)
 
-> **Autonomous E-Commerce Purchase Escrow with Multi-Node AI Hardware Defect Auditing powered by GenLayer Intelligent Contracts v0.2.16.**
+> **Autonomous E-Commerce Purchase Escrow with 2-Layer AI Hardware Defect Auditing (Layer 1: Google Gemini 3.6 Flash Vision AI + Layer 2: GenLayer VM On-Chain Consensus v0.2.16).**
 
 ---
 
-## 📍 Deployed Network Details
+## 📍 Deployed Network & Production Details
 
-* **Intelligent Contract Address (StudioNet)**: `0x53F19f3b8d3601CB3A4CbF33E43cC22294EDAE41`
+* **Intelligent Contract Address (StudioNet)**: [`0x53F19f3b8d3601CB3A4CbF33E43cC22294EDAE41`](https://studio.genlayer.com)
 * **Live Production dApp**: [https://warrantyshield-app.vercel.app](https://warrantyshield-app.vercel.app)
 * **GitHub Repository**: [https://github.com/Tannpd/warrantyshield](https://github.com/Tannpd/warrantyshield)
 
@@ -25,8 +26,28 @@ When buyers purchase expensive electronics online (GPUs, Laptops, Smartphones, D
 * **The Seller's Dilemma**: Ships a flawless device, but fears fraudulent buyers causing liquid submersion or dropping the device, then demanding a full refund.
 * **Traditional Platform Inefficiency**: Marketplaces (Amazon, eBay, Shopee) require 2 to 4 weeks of costly, manual human customer support mediation.
 
-### 🚀 The GenLayer Autonomous Solution
-**WarrantyShield** locks purchase deposits into smart escrows. GenLayer AI validator nodes independently scrape BOTH the official manufacturer warranty policy URL and the customer's unboxing video/defect diagnostic report URL via `gl.nondet.web.render`. A Senior Hardware Quality Auditor LLM prompt distinguishes genuine factory defects from user-inflicted physical/water damage, instantly granting **100% buyer refunds** or **releasing payments to honest sellers**.
+### 🚀 The 2-Layer Autonomous AI Solution
+**WarrantyShield** locks purchase deposits into smart escrows bound to seller-approved **Product ID** and **Sale ID**. 
+
+```
++-----------------------------------------------------------------------------------+
+| LAYER 1: OFF-CHAIN VISION AI INSPECTION                                           |
+| 1. Buyer uploads unboxing photo or MP4/WebM video file                            |
+| 2. Automatic Video Frame Extractor gets keyframe canvas                            |
+| 3. Google Gemini 3.6 Flash Vision AI inspects OLED pixels, water sensors, seals   |
+| 4. Backend Proxy (/api/analyze-vision) keeps API Keys 100% secure from client     |
+| 5. Generates scrapable Diagnostic Evidence Audit URL (/api/report?data=...)       |
++----------------------------------------+------------------------------------------+
+                                         |
+                                         v (Passes Evidence URL)
++----------------------------------------+------------------------------------------+
+| LAYER 2: ON-CHAIN GENLAYER VM CONSENSUS                                           |
+| 1. Buyer executes file_claim_and_audit(claim_id, evidence_url)                    |
+| 2. GenLayer AI Nodes scrape evidence URL via gl.nondet.web.render                 |
+| 3. LLM Auditor cross-references evidence & warranty policy bound to Product/Sale  |
+| 4. Strictly matches fault score threshold (score >= 50 -> 100% Buyer Refund)      |
++-----------------------------------------------------------------------------------+
+```
 
 ---
 
@@ -37,19 +58,19 @@ When buyers purchase expensive electronics online (GPUs, Laptops, Smartphones, D
                                   |   Official Warranty Policy URL        |
                                   +-------------------+-------------------+
                                                       |
-+---------------------+      create_warranty_escrow() | (Bound on-chain)
++---------------------+      create_warranty_escrow() | (Bound on-chain with Product & Sale ID)
 |  Buyer Wallet       | ------------------------------+-------------------> +-----------------------------+
 +---------------------+  Locks Deposit (GEN)                              |  WarrantyShield Escrow      |
-                                                                          |  Contract Vault             |
+                                                                           |  Contract Vault             |
                                   file_claim_and_audit(evidence_url)      |                             |
                                 ----------------------------------------> +--------------+--------------+
-                                                                                         |
-                                                                                         | gl.vm.run_nondet_unsafe()
-                                                                                         v
-                                                                          +-----------------------------+
-                                                                          | GenLayer AI Validator Nodes |
-                                                                          +--------------+--------------+
-                                                                                         |
+                                                                                          |
+                                                                                          | gl.vm.run_nondet_unsafe()
+                                                                                          v
+                                                                           +-----------------------------+
+                                                                           | GenLayer AI Validator Nodes |
+                                                                           +--------------+--------------+
+                                                                                          |
                                            +---------------------------------------------+---------------------------------------------+
                                            |                                                                                           |
                                            v                                                                                           v
@@ -63,35 +84,40 @@ When buyers purchase expensive electronics online (GPUs, Laptops, Smartphones, D
 ```
 
 ### 🔒 Key Contract Rules & Safety Compliance
-1. **Strict Boolean Type Validation**:
-   - Evaluates `isinstance(raw_faulty, bool)` in Leader, Validator, and Settlement execution paths. Rejects string booleans (e.g. `"false"`) to prevent coercion exploits.
-2. **Fail-Closed Consensus Security**:
+1. **Product & Sale ID Binding**:
+   - `create_warranty_escrow()` stores and validates `product_id` and `sale_id` state mappings (`TreeMap[str, str]`), ensuring evidence reports cannot be reused across different orders.
+2. **Strict Score Threshold Matching**:
+   - Enforces payout verdict matching: `is_faulty = (score >= 50)` in Leader, Validator, and Settlement execution paths. Rejects mismatched raw LLM booleans.
+3. **Strict Boolean Type Validation**:
+   - Evaluates `isinstance(raw_faulty, bool)` in all consensus paths to prevent string coercion exploits (e.g. `"false"`).
+4. **Fail-Closed Consensus Security**:
    - If web fetching or LLM execution fails, `validator_fn` returns `False`, causing consensus to fail closed without clearing escrow balances.
-3. **Unsuppressed Token Transfers**:
-   - Executes `other_contract.emit_transfer(...)` without `try/except` suppression to ensure atomic state reverts on transfer failures.
-4. **Access Control & Evidence Binding**:
-   - Only the registered buyer (`sender == claim_buyer`) can submit defect evidence or trigger manual releases.
+5. **Backend API Key Security**:
+   - Layer 1 Vision AI requests pass through `/api/analyze-vision` serverless backend proxy, keeping Google Gemini API keys 100% hidden from client-side code and browser F12 inspection.
+6. **Access Control & Signer Visibility**:
+   - Only the registered buyer (`sender == claim_buyer`) can file claims or trigger manual releases. Active MetaMask Signer is displayed during write transactions.
 
 ---
 
 ## 🧪 Automated Unit Test Verification
 
-The contract includes a complete `unittest` test suite covering all 7 core execution paths:
+The contract includes a complete `unittest` test suite covering all 8 core execution paths:
 
 ```powershell
 # Run unit tests inside python virtual environment
 cd D:\Gen\WarrantyShield
-.venv\Scripts\python -m unittest tests/test_warrantyshield.py -v
+.venv\Scripts\python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-### Test Results Summary:
-* `test_create_warranty_escrow_payable`: **OK** (Locks deposit & binds policy URL).
+### Test Results Summary (8/8 Passed):
+* `test_create_warranty_escrow_payable`: **OK** (Locks deposit & binds product ID, sale ID & policy URL).
 * `test_file_claim_factory_defect_refunds_buyer`: **OK** (Factory DOA triggers 100% refund).
 * `test_file_claim_user_damage_releases_to_seller`: **OK** (User physical damage releases to seller).
+* `test_payout_verdict_strictly_matches_score_threshold`: **OK** (Forces `is_faulty = False` when `score < 50`).
 * `test_release_to_seller_buyer_only`: **OK** (Access control enforces buyer-only release).
 * `test_failed_fetch_does_not_release_escrow`: **OK** (Fail-closed safety preserves escrow on fetch error).
 * `test_strict_boolean_validation_rejects_string`: **OK** (String `"false"` is rejected).
-* `test_reproducible_compilation`: **OK** (Syntax & compilation verified).
+* `test_reproducible_compilation`: **OK** (GenVM contract compilation verified).
 
 ---
 
@@ -115,7 +141,7 @@ cd warrantyshield/frontend
 # Install dependencies
 npm install
 
-# Run dev server
+# Run local development server
 npm run dev
 
 # Build for production
