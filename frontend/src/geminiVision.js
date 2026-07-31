@@ -49,7 +49,10 @@ Seller-Approved Sale ID: ${saleId}
 
 Instructions:
 1. Examine the image for hardware defects (e.g. OLED screen dead pixels/stripes, DOA motherboard burnt IC, battery cell swelling) versus user physical damage (e.g. cracked screen glass from drop, liquid submersion, water contact sensor tripped).
-2. Estimate a "fault_score" from 0 to 100 (where 0 means 100% user damage/no defect, and 100 means confirmed factory DOA defect).
+2. STRICT FAULT SCORE EVALUATION RULES:
+   - If the image/video is random, obscured, unopened bubble wrap, package box only, or uninspectable: You MUST set Estimated Fault Score to 0 and explicitly reject the claim for invalid/insufficient unboxing evidence.
+   - If user physical damage, drop marks, or water submersion is detected: Set Estimated Fault Score between 0 and 40.
+   - ONLY set Estimated Fault Score >= 50 if clear, visible factory DOA hardware defect (e.g. screen dead pixels, burnt IC) on the unboxed device is verified.
 3. Write a concise 2-3 sentence technical diagnostic finding.
 
 Format your final response EXACTLY in this structured report template:
